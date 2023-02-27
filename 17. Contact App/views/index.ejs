@@ -1,0 +1,19 @@
+<div class="container">
+  <div class="row cols">
+    <h1>Halo nama saya = <%= nama%></h1>
+    <h1>Saya punya lagu berjudul = <%= title%></h1>
+    <h6 class="mt-5 mb-3">Berikut adalah daftar nama mahasiswa :</h6>
+
+    <!-- Kondisi jika data kosong maka akan tampil pesan data mahasiswa masih kosong -->
+    <% if (mahasiswas.length < 1) { %>
+      <p>Data mahasiswa masih kosong</p>
+    <% } else {
+      // Pengulangan menampilkan mahasiswas dari route -->
+      mahasiswas.forEach(mahasiswa => { %>
+        <h5>Mahasiswa : <%= mahasiswa.nama %></h5>
+        <h5>Email : <%= mahasiswa.email %></h5>
+        <hr />
+    <% })}%> 
+  </div>
+</div>
+   
