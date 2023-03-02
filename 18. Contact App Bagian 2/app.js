@@ -1,6 +1,10 @@
 const express = require("express");
 const expressLayouts = require("express-ejs-layouts");
-const { loadContact, findContact, addContact } = require("./utils/contacts.js");
+const { loadContact, findContact, cekDuplikat, addContact } = require("./utils/contacts.js");
+const { body, validationResult, check } = require("express-validator");
+const session = require("express-session");
+const cookieParser = require("cookie-parser");
+const flash = require("connect-flash");
 
 const app = express();
 const port = 3000;
@@ -9,13 +13,19 @@ const port = 3000;
 app.set("view engine", "ejs");
 app.use(expressLayouts);
 app.use(express.static("public")); // Build in Middleware
-app.use(express.urlencoded()); //untuk parsing data di post contact
+app.use(express.urlencoded({ extended: true })); //untuk parsing data di post contact dan menghilangkan informasi deprecated body parser
 
-// Application level middleware, next dapat ditulis jika ingin mencari middleware selanjutnya, jika ingin berhenti setelah proses kode maka next tidak perlu di tulis
-app.use((req, res, next) => {
-  console.log("Time", Date.now());
-  next();
-});
+// kofigurasi flash
+app.use(cookieParser("secret"));
+app.use(
+  session({
+    cookie: { maxAge: 6000 },
+    secret: "secret",
+    resave: true,
+    saveUninitialized: true,
+  })
+);
+app.use(flash());
 
 app.get("/", (req, res) => {
   let mahasiswas = [
@@ -48,29 +58,57 @@ app.get("/about", (req, res) => {
 });
 
 app.get("/contact", (req, res) => {
-  const contacts =  loadContact();
-  
+  const contacts = loadContact();
+
   res.render("contact", {
     layout: "layouts/main-layout",
     title: "Halaman Contact",
     contacts,
+    msg: req.flash("msg"),
   });
 });
 
 // halaman form tambah contact
-app.get("/contact/add",(req,res) => {
+app.get("/contact/add", (req, res) => {
   res.render("add-contact", {
-    title : "Form Tambah Data Contact",
-    layout : "layouts/main-layout"
-  })
-})
+    title: "Form Tambah Data Contact",
+    layout: "layouts/main-layout",
+  });
+});
 
 // proses data contact
-app.post("/contact",(req,res) => {
-  // res.send(req.body);
-  addContact(req.body);
-  res.redirect("/contact"); // kalau redirect sprt ini maka route yang akan menanganinya bukan "POST" tapi "GET"
-})
+// proses penamaan validatornya harus sama dengan name, bukan id atau yg lainnya
+app.post(
+  "/contact",
+  [
+    body("nama").custom((value) => {
+      const duplikat = cekDuplikat(value);
+      if (duplikat) {
+        throw new Error("Nama contact sudah digunakan!");
+      }
+      return true;
+    }),
+    check("email", "Email tidak valid!").isEmail(),
+    check("noHp", "no HP tidak valid!").isMobilePhone("id-ID"),
+  ],
+  (req, res) => {
+    // res.send(req.body);
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      // return res.status(400).json({ errors: errors.array() });
+      res.render("add-contact", {
+        title: "Form Tambah Data Contact",
+        layout: "layouts/main-layout",
+        errors: errors.array(),
+      });
+    } else {
+      addContact(req.body);
+      // kirimkan flash message
+      req.flash("msg", "Data contact berhasil ditambahkan");
+      res.redirect("/contact"); // kalau redirect sprt ini maka route yang akan menanganinya bukan "POST" tapi "GET"
+    }
+  }
+);
 
 // halaman detail contact
 app.get("/contact/:nama", (req, res) => {
